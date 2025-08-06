@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>課堂點名系統</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700&display=swap');
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- 標題 -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-gray-800 mb-2">📚 課堂點名系統</h1>
+            <p class="text-gray-600">請選擇課程資訊並填寫學生姓名</p>
+        </div>
+
+        <!-- 主要表單 -->
+        <div class="max-w-2xl mx-auto bg-white rounded-2xl shadow-xl p-8">
+            <form id="attendanceForm" class="space-y-6">
+                <!-- 周次日期選擇 -->
+                <div class="space-y-2">
+                    <label for="weekDate" class="block text-sm font-semibold text-gray-700">📅 周次日期</label>
+                    <select id="weekDate" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white">
+                        <option value="">請選擇周次日期</option>
+                    </select>
+                </div>
+
+                <!-- 節次選擇 -->
+                <div class="space-y-2">
+                    <label for="period" class="block text-sm font-semibold text-gray-700">⏰ 上課節次</label>
+                    <select id="period" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white">
+                        <option value="">請選擇節次</option>
+                        <option value="早自習">早自習 (07:50-08:30)</option>
+                        <option value="第一節">第一節 (08:40-09:20)</option>
+                        <option value="第二節">第二節 (09:30-10:10)</option>
+                        <option value="第三節">第三節 (10:30-11:10)</option>
+                        <option value="第四節">第四節 (11:20-12:00)</option>
+                        <option value="午休">午休 (12:40-13:20)</option>
+                        <option value="第五節">第五節 (13:30-14:10)</option>
+                        <option value="第六節">第六節 (14:20-15:00)</option>
+                        <option value="第七節">第七節 (15:20-16:00)</option>
+                    </select>
+                </div>
+
+                <!-- 課程名稱選擇 -->
+                <div class="space-y-2">
+                    <label for="course" class="block text-sm font-semibold text-gray-700">📖 課程名稱</label>
+                    <select id="course" class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 bg-white">
+                        <option value="">請選擇課程</option>
+                        <option value="語文三A">語文三A</option>
+                        <option value="語文三B">語文三B</option>
+                        <option value="語文四A">語文四A</option>
+                        <option value="創造力五A">創造力五A</option>
+                        <option value="創造力五B">創造力五B</option>
+                        <option value="創造力六A">創造力六A</option>
+                        <option value="創造力六B">創造力六B</option>
+                        <option value="獨立研究六">獨立研究六</option>
+                    </select>
+                </div>
+
+                <!-- 學生姓名輸入區域 -->
+                <div class="space-y-4">
+                    <label class="block text-sm font-semibold text-gray-700">👥 學生點名</label>
+                    
+                    <!-- 學生輸入框 -->
+                    <div class="flex gap-2">
+                        <input type="text" id="studentName" placeholder="請輸入學生姓名後按Enter提交" 
+                               class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200">
+                        <button type="button" onclick="submitStudent()" 
+                                class="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors duration-200 font-medium">
+                            ✅ 提交
+                        </button>
+                    </div>
+
+                    <!-- 學生點名記錄顯示區域 -->
+                    <div id="studentList" class="space-y-2 max-h-60 overflow-y-auto">
+                        <!-- 學生點名記錄會動態顯示在這裡 -->
+                    </div>
+                </div>
+
+                <!-- 操作按鈕 -->
+                <div class="flex gap-4 pt-6">
+                    <button type="button" onclick="exportToExcel()" 
+                            class="flex-1 px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors duration-200 font-semibold">
+                        📊 匯出Excel
+                    </button>
+                    <button type="button" onclick="clearForm()" 
+                            class="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors duration-200 font-semibold">
+                        🗑️ 清空
+                    </button>
+                </div>
+            </form>
+        </div>
+
+
+    </div>
+
+    <script>
+        let attendanceRecords = [];
+
+        // 生成周次日期選項 (第1周2025年9月1日到第21周2026年1月20日)
+        function generateWeekDateOptions() {
+            const weekDateSelect = document.getElementById('weekDate');
+            const startDate = new Date(2025, 8, 1); // 2025年9月1日 (月份從0開始)
+            const endDate = new Date(2026, 0, 20); // 2026年1月20日
+            
+            const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+            
+            let currentDate = new Date(startDate);
+            let weekNumber = 1;
+            
+            while (currentDate <= endDate) {
+                // 計算這一周的開始日期（星期一）
+                const weekStart = new Date(currentDate);
+                const dayOfWeek = weekStart.getDay();
+                const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+                weekStart.setDate(weekStart.getDate() - daysToMonday);
+                
+                // 生成這一周的每一天
+                for (let i = 0; i < 7; i++) {
+                    const currentDay = new Date(weekStart);
+                    currentDay.setDate(weekStart.getDate() + i);
+                    
+                    if (currentDay > endDate) break;
+                    
+                    const year = currentDay.getFullYear();
+                    const month = String(currentDay.getMonth() + 1).padStart(2, '0');
+                    const day = String(currentDay.getDate()).padStart(2, '0');
+                    const weekday = weekdays[currentDay.getDay()];
+                    
+                    const dateValue = `${year}-${month}-${day}`;
+                    const dateText = `第${weekNumber}周 ${year}年${month}月${day}日 星期${weekday}`;
+                    
+                    const option = document.createElement('option');
+                    option.value = dateValue;
+                    option.textContent = dateText;
+                    option.setAttribute('data-week', weekNumber);
+                    weekDateSelect.appendChild(option);
+                }
+                
+                // 移動到下一周
+                currentDate.setDate(currentDate.getDate() + 7);
+                weekNumber++;
+                
+                if (weekNumber > 21) break;
+            }
+        }
+
+        function submitStudent() {
+            const weekDate = document.getElementById('weekDate').value;
+            const period = document.getElementById('period').value;
+            const course = document.getElementById('course').value;
+            const nameInput = document.getElementById('studentName');
+            const name = nameInput.value.trim();
+            
+            if (!weekDate || !period || !course) {
+                alert('請先選擇周次日期、節次和課程名稱！');
+                return;
+            }
+            
+            if (name === '') {
+                alert('請輸入學生姓名！');
+                return;
+            }
+            
+            // 檢查是否重複
+            const isDuplicate = attendanceRecords.some(record => 
+                record.weekDate === weekDate && 
+                record.period === period && 
+                record.course === course && 
+                record.studentName === name
+            );
+            
+            if (isDuplicate) {
+                alert('此學生在相同課程時段已有點名記錄！');
+                return;
+            }
+            
+            // 記錄送出時間
+            const submitTime = new Date();
+            const timeString = submitTime.toLocaleString('zh-TW', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            });
+            
+            // 獲取周次資訊
+            const selectedOption = document.getElementById('weekDate').selectedOptions[0];
+            const weekNumber = selectedOption.getAttribute('data-week');
+            
+            // 新增點名記錄
+            const record = {
+                weekDate: weekDate,
+                weekDateText: selectedOption.text,
+                weekNumber: weekNumber,
+                period: period,
+                course: course,
+                studentName: name,
+                submitTime: timeString
+            };
+            
+            attendanceRecords.push(record);
+            nameInput.value = '';
+            updateStudentList();
+            
+            alert(`${name} 點名成功！`);
+        }
+
+        function updateStudentList() {
+            const listContainer = document.getElementById('studentList');
+            
+            if (attendanceRecords.length === 0) {
+                listContainer.innerHTML = '<p class="text-gray-500 text-center py-4">尚未有點名記錄</p>';
+                return;
+            }
+            
+            listContainer.innerHTML = attendanceRecords.map((record, index) => {
+                // 第一筆記錄顯示完整資訊，其餘只顯示學生姓名和時間
+                if (index === 0) {
+                    return `
+                        <div class="bg-blue-50 px-4 py-4 rounded-lg border-l-4 border-blue-400 mb-2">
+                            <div class="text-sm font-semibold text-gray-700 mb-2">課程資訊</div>
+                            <div class="text-sm text-gray-600 mb-2">
+                                📅 ${record.weekDateText}<br>
+                                ⏰ ${record.period}<br>
+                                📖 ${record.course}
+                            </div>
+                            <div class="border-t pt-2">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <span class="font-medium text-gray-800">${index + 1}. ${record.studentName} ✅</span>
+                                        <div class="text-xs text-gray-500">
+                                            送出時間: ${record.submitTime}
+                                        </div>
+                                    </div>
+                                    <button onclick="removeRecord(${index})" 
+                                            class="text-red-500 hover:text-red-700 transition-colors duration-200 font-bold">
+                                        ❌
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    return `
+                        <div class="bg-green-50 px-4 py-3 rounded-lg border-l-4 border-green-400">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <span class="font-medium text-gray-800">${index + 1}. ${record.studentName} ✅</span>
+                                    <div class="text-xs text-gray-500">
+                                        送出時間: ${record.submitTime}
+                                    </div>
+                                </div>
+                                <button onclick="removeRecord(${index})" 
+                                        class="text-red-500 hover:text-red-700 transition-colors duration-200 font-bold">
+                                    ❌
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }
+            }).join('');
+        }
+
+        function removeRecord(index) {
+            if (confirm('確定要刪除這筆點名記錄嗎？')) {
+                attendanceRecords.splice(index, 1);
+                updateStudentList();
+            }
+        }
+
+        function exportToExcel() {
+            if (attendanceRecords.length === 0) {
+                alert('沒有可匯出的點名記錄！');
+                return;
+            }
+            
+            // 建立Excel資料
+            const workbook = XLSX.utils.book_new();
+            
+            // 點名記錄工作表
+            const attendanceData = [
+                ['課堂點名記錄'],
+                [''],
+                ['序號', '學生姓名', '周次日期', '節次', '課程', '送出時間']
+            ];
+            
+            // 新增所有點名記錄
+            attendanceRecords.forEach((record, index) => {
+                attendanceData.push([
+                    index + 1,
+                    record.studentName,
+                    record.weekDateText,
+                    record.period,
+                    record.course,
+                    record.submitTime
+                ]);
+            });
+            
+            // 新增統計資訊
+            attendanceData.push(['']);
+            attendanceData.push(['總點名人次', attendanceRecords.length]);
+            attendanceData.push(['匯出時間', new Date().toLocaleString('zh-TW')]);
+            
+            const worksheet = XLSX.utils.aoa_to_sheet(attendanceData);
+            
+            // 設定欄位寬度
+            worksheet['!cols'] = [
+                { width: 8 },
+                { width: 15 },
+                { width: 25 },
+                { width: 15 },
+                { width: 15 },
+                { width: 20 }
+            ];
+            
+            // 設定標題樣式
+            worksheet['A1'] = { 
+                v: '課堂點名記錄', 
+                t: 's',
+                s: { 
+                    font: { bold: true, sz: 16 },
+                    alignment: { horizontal: 'center' }
+                }
+            };
+            
+            XLSX.utils.book_append_sheet(workbook, worksheet, '點名記錄');
+            
+            // 產生檔案名稱
+            const currentDate = new Date().toISOString().split('T')[0];
+            const fileName = `課堂點名記錄_${currentDate}.xlsx`;
+            
+            // 匯出檔案
+            XLSX.writeFile(workbook, fileName);
+            
+            alert('Excel檔案已成功匯出！');
+        }
+
+        function clearForm() {
+            if (confirm('確定要清空所有點名記錄嗎？')) {
+                document.getElementById('attendanceForm').reset();
+                attendanceRecords = [];
+                updateStudentList();
+            }
+        }
+
+        // 初始化
+        generateWeekDateOptions();
+        updateStudentList();
+
+        // 按Enter鍵提交學生
+        document.getElementById('studentName').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                submitStudent();
+            }
+        });
+    </script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'96abcdf4c0574aa2',t:'MTc1NDQ1NDY4NS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
